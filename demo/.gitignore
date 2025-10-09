@@ -31,3 +31,16 @@ build/
 
 ### VS Code ###
 .vscode/
+
+### Variables locales BBDD Tickea ###
+run-local.ps1
+src/main/resources/application-local.properties
+.env
+
+# Config locales con secretos
+application-local.properties
+.env
+*.env
+*.local.*
+
+
