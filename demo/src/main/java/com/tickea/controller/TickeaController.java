@@ -1,6 +1,6 @@
 package com.tickea.controller;
 
-import com.tickea.JPA.Ticket;
+import com.tickea.jpa.*;
 import com.tickea.dto.TicketResponse;
 import com.tickea.dto.TicketUpsertRequest;
 import com.tickea.repository.TicketRepository;

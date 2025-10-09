@@ -1,4 +1,6 @@
-
-**/run-local.ps1
-
-replacements.txt
+demo/src/main/resources/application-local.properties
+/.metadata/
+.sonarlint/
+demo/*.ps1
+.env
+target/

@@ -11,7 +11,7 @@ import org.springframework.web.client.RestTemplate;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.tickea.JPA.Ticket;
+import com.tickea.jpa.*;
 import com.tickea.dto.TicketItemResponse;
 import com.tickea.dto.TicketResponse;
 import com.tickea.dto.TicketUpsertRequest;
