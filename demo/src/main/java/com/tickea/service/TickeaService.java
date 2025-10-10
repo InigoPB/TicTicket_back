@@ -20,13 +20,14 @@ import com.tickea.repository.TicketRepository;
 
 @Service
 public class TickeaService {
-    private final TicketRepository ticketRepository;
-    private final TicketItemRepository ticketItemRepository;
-    private final RestTemplate restTemplate = new RestTemplate();
-    
-    // URL y token para UiPath Orchestrator. IÑIGO mira a ver si los traes del config quedaria wapote
-    private static final String UIPATH_URL = "https://cloud.uipath.com/tickea/DefaultTenant/orchestrator_/t/e80665ba-4f97-4190-b841-34cf16f6d155/Tickea_Orchestrator";
-    private static final String BEARER_TOKEN = "rt_3FD97674A4782B2467FB50113A7EA8DA80721642C6D8C50B29D2482B4255AF62-1";
+	private final TicketRepository ticketRepository;
+	private final TicketItemRepository ticketItemRepository;
+	private final RestTemplate restTemplate = new RestTemplate();
+
+	// URL y token para UiPath Orchestrator. IÑIGO mira a ver si los traes del
+	// config quedaria wapote
+	private static final String UIPATH_URL = "https://cloud.uipath.com/tickea/DefaultTenant/orchestrator_/t/e80665ba-4f97-4190-b841-34cf16f6d155/Tickea_Orchestrator";
+	private static final String BEARER_TOKEN = "rt_3FD97674A4782B2467FB50113A7EA8DA80721642C6D8C50B29D2482B4255AF62-1";
 
 	public TickeaService(TicketRepository ticketRepository, TicketItemRepository ticketItemRepository) {
 		super();
@@ -35,131 +36,124 @@ public class TickeaService {
 	}
 
 	public String startJob() {
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_JSON);
-        headers.set("Authorization", "Bearer " + BEARER_TOKEN);
+		HttpHeaders headers = new HttpHeaders();
+		headers.setContentType(MediaType.APPLICATION_JSON);
+		headers.set("Authorization", "Bearer " + BEARER_TOKEN);
 
-        HttpEntity<String> request = new HttpEntity<>("{}", headers);
+		HttpEntity<String> request = new HttpEntity<>("{}", headers);
 
-        RestTemplate restTemplate = new RestTemplate();
-        ResponseEntity<String> response = restTemplate.exchange(
-                UIPATH_URL,
-                HttpMethod.POST,
-                request,
-                String.class
-        );
+		RestTemplate restTemplate = new RestTemplate();
+		ResponseEntity<String> response = restTemplate.exchange(UIPATH_URL, HttpMethod.POST, request, String.class);
 
-        return response.getBody();
-    }
-	
+		return response.getBody();
+	}
+
 	public TicketResponse procesarTicket(TicketUpsertRequest peticion) {
-	    //Crear Ticket concorde a la tabla real
-	    Ticket ticket = new Ticket();
-	    ticket.setFirebaseUid(peticion.getUidUsuario());
-	    ticket.setFechaTicket(parseFechaISO(peticion.getFecha())); // "2025-10-06" -> LocalDate
-	    
-	    Ticket saved = ticketRepository.save(ticket); // INSERT en tickets
-	    
-	    //Llamada a UiPath (stub mientras tanto)
-	    String resultadoJSON = llamarUiPathStub(peticion.getTextoFilas());
+		// Crear Ticket concorde a la tabla real
+		Ticket ticket = new Ticket();
+		ticket.setFirebaseUid(peticion.getUidUsuario());
+		ticket.setFechaTicket(parseFechaISO(peticion.getFecha())); // "2025-10-06" -> LocalDate
 
-	    //Parsear productos y guardar en ticket_items
-	    List<TicketItem> ticketItems = new ArrayList<>();
-	    List<TicketItemResponse> ticketItemsResponse = new ArrayList<>();
-	    
-	    if (resultadoJSON != null && !resultadoJSON.isBlank()) {
-	        try {
-	            ObjectMapper mapeador = new ObjectMapper();
-	            JsonNode root = mapeador.readTree(resultadoJSON);
-	            JsonNode arrProd = (root != null) ? root.get("productos") : null;
+		Ticket saved = ticketRepository.save(ticket); // INSERT en tickets
 
-	            if (arrProd != null && arrProd.isArray()) {
-	                for (JsonNode producto : arrProd) {
+		// Llamada a UiPath (stub mientras tanto)
+		String resultadoJSON = llamarUiPathStub(peticion.getTextoFilas());
 
-	                    //TicketItem (Entidad JPA)
-	                    TicketItem item = new TicketItem();
-	                    item.setTicket(saved);
+		// Parsear productos y guardar en ticket_items
+		List<TicketItem> ticketItems = new ArrayList<>();
+		List<TicketItemResponse> ticketItemsResponse = new ArrayList<>();
 
-	                    //codigo_producto
-	                    item.setCodigoProducto(
-	                        (producto.hasNonNull("codigo")) ? producto.get("codigo").asText() : ""
-	                    );
+		if (resultadoJSON != null && !resultadoJSON.isBlank()) {
+			try {
+				ObjectMapper mapeador = new ObjectMapper();
+				JsonNode root = mapeador.readTree(resultadoJSON);
+				JsonNode arrProd = (root != null) ? root.get("productos") : null;
 
-	                    //nombre_producto
-	                    item.setNombreProducto(
-	                        (producto.hasNonNull("nombre")) ? producto.get("nombre").asText() : null
-	                    );
+				if (arrProd != null && arrProd.isArray()) {
+					for (JsonNode producto : arrProd) {
 
-	                    //operaciones
-	                    item.setOperaciones(
-	                        (producto.hasNonNull("operaciones")) ? producto.get("operaciones").asInt() : 0
-	                    );
+						// TicketItem (Entidad JPA)
+						TicketItem item = new TicketItem();
+						item.setTicket(saved);
 
-	                    //total_importe
-	                    item.setTotalImporte(
-	                        (producto.hasNonNull("importeTotal"))
-	                            ? new java.math.BigDecimal(producto.get("importeTotal").asText())
-	                            : BigDecimal.ZERO
-	                    );
+						// codigo_producto
+						item.setCodigoProducto((producto.hasNonNull("codigo")) ? producto.get("codigo").asText() : "");
 
-	                    //peso
-	                    item.setPeso(
-	                        (producto.hasNonNull("peso"))
-	                            ? new java.math.BigDecimal(producto.get("peso").asText())
-	                            : BigDecimal.ZERO
-	                    );
+						// nombre_producto
+						item.setNombreProducto(
+								(producto.hasNonNull("nombre")) ? producto.get("nombre").asText() : null);
 
-	                    //unidades
-	                    item.setUnidades(
-	                        (producto.hasNonNull("unidades"))
-	                            ? new java.math.BigDecimal(producto.get("unidades").asText())
-	                            : BigDecimal.ZERO
-	                    );
+						// operaciones
+						item.setOperaciones(
+								(producto.hasNonNull("operaciones")) ? producto.get("operaciones").asInt() : 0);
 
-	                    ticketItems.add(item);
+						// total_importe
+						item.setTotalImporte((producto.hasNonNull("importeTotal"))
+								? new java.math.BigDecimal(producto.get("importeTotal").asText())
+								: BigDecimal.ZERO);
 
-	                    //TicketItemResponse (DTO de salida)
-	                    TicketItemResponse dto = new TicketItemResponse();
-	                    dto.setCodigo( (producto.hasNonNull("codigo")) ? producto.get("codigo").asText() : "" );
-	                    dto.setNombre( (producto.hasNonNull("nombre")) ? producto.get("nombre").asText() : "" );
-	                    dto.setUnidades( (producto.hasNonNull("unidades")) ? producto.get("unidades").asInt() : 0 );
-	                    dto.setPeso( (producto.hasNonNull("peso")) ? producto.get("peso").asDouble() : 0.0 );
-	                    dto.setImporteTotal( (producto.hasNonNull("importeTotal")) ? producto.get("importeTotal").asDouble() : 0.0 );
-	                    ticketItemsResponse.add(dto);
-	                }
-	            }
-	        } catch (Exception e) {
-	            e.printStackTrace();
-	        }
-	    }
-	    
-	    if (!ticketItems.isEmpty()) {
-	        ticketItemRepository.saveAll(ticketItems);
-	    }
+						// peso
+						item.setPeso(
+								(producto.hasNonNull("peso")) ? new java.math.BigDecimal(producto.get("peso").asText())
+										: BigDecimal.ZERO);
 
-	    TicketResponse resp = new TicketResponse();
-	    resp.setId(saved.getId());
-	    resp.setFecha(peticion.getFecha());
-	    resp.setUidUsuario(peticion.getUidUsuario());
-	    resp.setProductos(ticketItemsResponse);
-	    
-	    return resp;
+						// unidades
+						item.setUnidades((producto.hasNonNull("unidades"))
+								? new java.math.BigDecimal(producto.get("unidades").asText())
+								: BigDecimal.ZERO);
+
+						ticketItems.add(item);
+
+						// TicketItemResponse (DTO de salida)
+						TicketItemResponse dto = new TicketItemResponse();
+						dto.setCodigo((producto.hasNonNull("codigo")) ? producto.get("codigo").asText() : "");
+						dto.setNombre((producto.hasNonNull("nombre")) ? producto.get("nombre").asText() : "");
+						dto.setUnidades((producto.hasNonNull("unidades")) ? producto.get("unidades").asInt() : 0);
+						dto.setPeso((producto.hasNonNull("peso")) ? producto.get("peso").asDouble() : 0.0);
+						dto.setImporteTotal(
+								(producto.hasNonNull("importeTotal")) ? producto.get("importeTotal").asDouble() : 0.0);
+						ticketItemsResponse.add(dto);
+					}
+				}
+			} catch (Exception e) {
+				e.printStackTrace();
+			}
+		}
+
+		if (!ticketItems.isEmpty()) {
+			ticketItemRepository.saveAll(ticketItems);
+		}
+
+		TicketResponse resp = new TicketResponse();
+		resp.setId(saved.getId());
+		resp.setFecha(peticion.getFecha());
+		resp.setUidUsuario(peticion.getUidUsuario());
+		resp.setProductos(ticketItemsResponse);
+
+		return resp;
 	}
-	
+
+	public List<LocalDate> listarFechasRegistradas(String uid) {
+		if (uid == null || uid.isBlank()) {
+			throw new IllegalArgumentException("El Id de Usuario no puede ser nulo o vacío");
+		}
+		return ticketRepository.findFechasRegistradas(uid);
+	}
+
 	private LocalDate parseFechaISO(String s) {
-	    return LocalDate.parse(s); // formato yyyy-MM-dd
+		return LocalDate.parse(s); // formato yyyy-MM-dd
 	}
-	
+
 	private String llamarUiPathStub(String texto) {
-	    // [Integración real UiPath AQUÍ] -> mientras, stub para validar inserts
-	    return """
-	      {
-	        "productos": [
-	          { "nombre":"CAMARONES", "codigo":"56557", "operaciones":1, "importeTotal":21.36, "peso":2.500, "unidades":2 },
-	          { "nombre":"PEPETES JL 400/600", "codigo":"888432", "operaciones":10, "importeTotal":999.90, "peso":11.800, "unidades":13 }
-	        ]
-	      }
-	    """;
+		// [Integración real UiPath AQUÍ] -> mientras, stub para validar inserts
+		return """
+				  {
+				    "productos": [
+				      { "nombre":"CAMARONES", "codigo":"56557", "operaciones":1, "importeTotal":21.36, "peso":2.500, "unidades":2 },
+				      { "nombre":"PEPETES JL 400/600", "codigo":"888432", "operaciones":10, "importeTotal":999.90, "peso":11.800, "unidades":13 }
+				    ]
+				  }
+				""";
 	}
-	
+
 }
