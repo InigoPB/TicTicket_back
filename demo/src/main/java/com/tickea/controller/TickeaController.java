@@ -47,12 +47,14 @@ public class TickeaController {
     public ResponseEntity<TicketResponse> recibirTicketUiPath(
             @RequestParam String uidUsuario,
             @RequestParam String fecha,
-            @RequestBody List<Map<String, Object>> productos) {
+            @RequestBody String productosJson) {
 
         // Llamamos al servicio que procesa y guarda el ticket
-        TicketResponse response = tickeaService.procesarTicketUiPath(uidUsuario, fecha, productos);
+        // El servicio ahora se encargará de parsear el JSON string
+        TicketResponse response = tickeaService.procesarTicketUiPath(uidUsuario, fecha, productosJson);
         return ResponseEntity.ok(response);
     }
+
 
 
 

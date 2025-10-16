@@ -5,11 +5,15 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import org.json.JSONArray;
+import org.json.JSONObject;
 
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -104,57 +108,55 @@ public class TickeaService {
 }
 
 
-	public TicketResponse procesarTicketUiPath(String uidUsuario, String fecha, List<Map<String, Object>> productos) {
-		// 1️⃣ Crear ticket en la tabla tickets
-		Ticket ticket = new Ticket();
-		ticket.setFirebaseUid(uidUsuario);
-		ticket.setFechaTicket(LocalDate.parse(fecha));
-		ticket = ticketRepository.save(ticket); // Inserta en tabla tickets
+ 	@Transactional
+    public TicketResponse procesarTicketUiPath(String uidUsuario, String fecha, String productosJson) {
+        // Parsear el JSON usando org.json
+        JSONArray productosArray = new JSONArray(productosJson);
 
-		// 2️⃣ Crear items en la tabla ticket_items
-		List<TicketItemResponse> itemsResponse = new ArrayList<>();
-		for (Map<String, Object> p : productos) {
-			TicketItem item = new TicketItem();
-			item.setTicket(ticket); // Relación con el ticket creado
-			item.setNombreProducto((String)p.get("nombre"));
-			item.setCodigoProducto((String)p.get("codigo"));
+        // 1️⃣ Crear ticket
+        Ticket ticket = new Ticket();
+        ticket.setFirebaseUid(uidUsuario);
+        ticket.setFechaTicket(LocalDate.parse(fecha));
+        ticket = ticketRepository.save(ticket);
 
-			// Aseguramos que los campos numéricos sean Number y no String
-			item.setOperaciones(p.get("operaciones") != null 
-				? ((Number)p.get("operaciones")).intValue() 
-				: 0);
-			item.setTotalImporte(p.get("total_importe") != null 
-				? BigDecimal.valueOf(((Number)p.get("total_importe")).doubleValue()) 
-				: BigDecimal.ZERO);
-			item.setPeso(p.get("peso") != null 
-				? BigDecimal.valueOf(((Number)p.get("peso")).doubleValue()) 
-				: BigDecimal.ZERO);
-			item.setUnidades(p.get("unidades") != null 
-				? BigDecimal.valueOf(((Number)p.get("unidades")).doubleValue()) 
-				: BigDecimal.ZERO);
+        // 2️⃣ Crear items
+        List<TicketItemResponse> itemsResponse = new ArrayList<>();
+        for (int i = 0; i < productosArray.length(); i++) {
+            JSONObject p = productosArray.getJSONObject(i);
 
-			ticketItemRepository.save(item); // Inserta en tabla ticket_items
+            TicketItem item = new TicketItem();
+            item.setTicket(ticket);
+            item.setNombreProducto(p.getString("nombre"));
+            item.setCodigoProducto(p.getString("codigo"));
 
-			// Agregamos al DTO de respuesta
-			TicketItemResponse responseItem = new TicketItemResponse();
-			responseItem.setNombre(item.getNombreProducto());
-			responseItem.setCodigo(item.getCodigoProducto());
-			responseItem.setOperaciones(item.getOperaciones());
-			responseItem.setImporteTotal(item.getTotalImporte().doubleValue());
-			responseItem.setPeso(item.getPeso().doubleValue());
-			responseItem.setUnidades(item.getUnidades().intValue());
-			itemsResponse.add(responseItem);
-		}
+            item.setOperaciones(p.has("operaciones") && !p.isNull("operaciones") ? p.getInt("operaciones") : 0);
+            item.setTotalImporte(p.has("total_importe") && !p.isNull("total_importe") ? BigDecimal.valueOf(p.getDouble("total_importe")) : BigDecimal.ZERO);
+            item.setPeso(p.has("peso") && !p.isNull("peso") ? BigDecimal.valueOf(p.getDouble("peso")) : BigDecimal.ZERO);
+            item.setUnidades(p.has("unidades") && !p.isNull("unidades") ? BigDecimal.valueOf(p.getDouble("unidades")) : BigDecimal.ZERO);
 
-		// 3️⃣ Crear DTO de respuesta
-		TicketResponse ticketResponse = new TicketResponse();
-		ticketResponse.setId(ticket.getId());
-		ticketResponse.setFecha(ticket.getFechaTicket().toString());
-		ticketResponse.setUidUsuario(uidUsuario);
-		ticketResponse.setProductos(itemsResponse);
+            ticketItemRepository.save(item);
 
-		return ticketResponse;
-	}
+            // DTO de respuesta
+            TicketItemResponse responseItem = new TicketItemResponse();
+            responseItem.setNombre(item.getNombreProducto());
+            responseItem.setCodigo(item.getCodigoProducto());
+            responseItem.setOperaciones(item.getOperaciones());
+            responseItem.setImporteTotal(item.getTotalImporte().doubleValue());
+            responseItem.setPeso(item.getPeso().doubleValue());
+            responseItem.setUnidades(item.getUnidades().intValue());
+            itemsResponse.add(responseItem);
+        }
+
+        // 3️⃣ DTO de respuesta
+        TicketResponse ticketResponse = new TicketResponse();
+        ticketResponse.setId(ticket.getId());
+        ticketResponse.setFecha(ticket.getFechaTicket().toString());
+        ticketResponse.setUidUsuario(uidUsuario);
+        ticketResponse.setProductos(itemsResponse);
+
+        return ticketResponse;
+    }
+
 
 
     public List<LocalDate> listarFechasRegistradas(String uid) {
