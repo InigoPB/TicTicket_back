@@ -40,8 +40,6 @@ public class TickeaService {
 		headers.setContentType(MediaType.APPLICATION_JSON);
 		headers.set("Authorization", "Bearer " + BEARER_TOKEN);
 
-		HttpEntity<String> request = new HttpEntity<>("{}", headers);
-
 		RestTemplate restTemplate = new RestTemplate();
 		ResponseEntity<String> response = restTemplate.exchange(UIPATH_URL, HttpMethod.POST, request, String.class);
 
