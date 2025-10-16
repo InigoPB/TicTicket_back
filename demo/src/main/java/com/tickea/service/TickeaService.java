@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
@@ -11,12 +12,15 @@ import org.springframework.web.client.RestTemplate;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.tickea.jpa.*;
 import com.tickea.dto.TicketItemResponse;
 import com.tickea.dto.TicketResponse;
 import com.tickea.dto.TicketUpsertRequest;
 import com.tickea.repository.TicketItemRepository;
 import com.tickea.repository.TicketRepository;
+
+import jakarta.transaction.Transactional;
 
 @Service
 public class TickeaService {
@@ -26,8 +30,9 @@ public class TickeaService {
 
 	// URL y token para UiPath Orchestrator. IÑIGO mira a ver si los traes del
 	// config quedaria wapote
-	private static final String UIPATH_URL = "https://cloud.uipath.com/tickea/DefaultTenant/orchestrator_/t/e80665ba-4f97-4190-b841-34cf16f6d155/Tickea_Orchestrator";
+	private static final String UIPATH_URL = "https://cloud.uipath.com/tickea/DefaultTenant/orchestrator_/t/3f146a50-d8ba-4f9d-b77c-99bafb2eb3c4/TickeaDataExtractor";
 	private static final String BEARER_TOKEN = "rt_3FD97674A4782B2467FB50113A7EA8DA80721642C6D8C50B29D2482B4255AF62-1";
+	private static final String UIPATH_URL_BASE = "https://cloud.uipath.com/tickea/DefaultTenant/orchestrator_";
 
 	public TickeaService(TicketRepository ticketRepository, TicketItemRepository ticketItemRepository) {
 		super();
@@ -35,123 +40,126 @@ public class TickeaService {
 		this.ticketItemRepository = ticketItemRepository;
 	}
 
-	public String startJob() {
-		HttpHeaders headers = new HttpHeaders();
-		headers.setContentType(MediaType.APPLICATION_JSON);
-		headers.set("Authorization", "Bearer " + BEARER_TOKEN);
+	public String StartJob(String textoFilas) throws Exception {
+    final int TIMEOUT_MS = 300_000; // 5 minutos máximo de espera
+    final int POLL_INTERVAL_MS = 5000; // cada 5 segundos
 
-		RestTemplate restTemplate = new RestTemplate();
-		ResponseEntity<String> response = restTemplate.exchange(UIPATH_URL, HttpMethod.POST, request, String.class);
+    HttpHeaders headers = new HttpHeaders();
+    headers.setContentType(MediaType.APPLICATION_JSON);
+    headers.set("Authorization", "Bearer " + BEARER_TOKEN);
 
-		return response.getBody();
-	}
+    RestTemplate restTemplate = new RestTemplate();
+    ObjectMapper mapper = new ObjectMapper();
 
-	public TicketResponse procesarTicket(TicketUpsertRequest peticion) {
-		// Crear Ticket concorde a la tabla real
+    // Convertir textoFilas a JSON
+    ObjectNode bodyJson = mapper.createObjectNode();
+    bodyJson.put("texto_ocr", textoFilas);
+
+    HttpEntity<String> request = new HttpEntity<>(mapper.writeValueAsString(bodyJson), headers);
+
+    // Lanzar el job
+    ResponseEntity<String> postResponse = restTemplate.exchange(UIPATH_URL, HttpMethod.POST, request, String.class);
+
+    if (!postResponse.getStatusCode().is2xxSuccessful()) {
+        throw new RuntimeException("Error al lanzar el job: " + postResponse.getBody());
+    }
+
+    JsonNode postRoot = mapper.readTree(postResponse.getBody());
+    if (!postRoot.has("id")) {
+        throw new RuntimeException("Respuesta inválida al lanzar el job: " + postResponse.getBody());
+    }
+
+    long jobId = postRoot.get("id").asLong();
+    String jobUrl = UIPATH_URL_BASE + "/odata/Jobs(" + jobId + ")";
+
+    // Esperar a que termine el job
+    long startTime = System.currentTimeMillis();
+    while (true) {
+        ResponseEntity<String> getResponse = restTemplate.exchange(jobUrl, HttpMethod.GET, new HttpEntity<>(headers), String.class);
+
+        if (!getResponse.getStatusCode().is2xxSuccessful()) {
+            throw new RuntimeException("Error al consultar el job: " + getResponse.getBody());
+        }
+
+        JsonNode jobData = mapper.readTree(getResponse.getBody());
+        String state = jobData.path("State").asText();
+
+        switch (state) {
+            case "Pending":
+            case "Running":
+                if (System.currentTimeMillis() - startTime > TIMEOUT_MS) {
+                    throw new RuntimeException("Timeout: el job no terminó en " + (TIMEOUT_MS / 1000) + " segundos");
+                }
+                Thread.sleep(POLL_INTERVAL_MS);
+                break;
+            case "Successful":
+                return getResponse.getBody(); // job completado correctamente
+            case "Faulted":
+            case "Stopped":
+                throw new RuntimeException("Job terminó con error: " + getResponse.getBody());
+            default:
+                throw new RuntimeException("Estado desconocido del job: " + state);
+        }
+    }
+}
+
+
+	public TicketResponse procesarTicketUiPath(String uidUsuario, String fecha, List<Map<String, Object>> productos) {
+		// 1️⃣ Crear ticket en la tabla tickets
 		Ticket ticket = new Ticket();
-		ticket.setFirebaseUid(peticion.getUidUsuario());
-		ticket.setFechaTicket(parseFechaISO(peticion.getFecha())); // "2025-10-06" -> LocalDate
+		ticket.setFirebaseUid(uidUsuario);
+		ticket.setFechaTicket(LocalDate.parse(fecha));
+		ticket = ticketRepository.save(ticket); // Inserta en tabla tickets
 
-		Ticket saved = ticketRepository.save(ticket); // INSERT en tickets
+		// 2️⃣ Crear items en la tabla ticket_items
+		List<TicketItemResponse> itemsResponse = new ArrayList<>();
+		for (Map<String, Object> p : productos) {
+			TicketItem item = new TicketItem();
+			item.setTicket(ticket); // Relación con el ticket creado
+			item.setNombreProducto((String)p.get("nombre"));
+			item.setCodigoProducto((String)p.get("codigo"));
 
-		// Llamada a UiPath (stub mientras tanto)
-		String resultadoJSON = llamarUiPathStub(peticion.getTextoFilas());
+			// Aseguramos que los campos numéricos sean Number y no String
+			item.setOperaciones(p.get("operaciones") != null 
+				? ((Number)p.get("operaciones")).intValue() 
+				: 0);
+			item.setTotalImporte(p.get("total_importe") != null 
+				? BigDecimal.valueOf(((Number)p.get("total_importe")).doubleValue()) 
+				: BigDecimal.ZERO);
+			item.setPeso(p.get("peso") != null 
+				? BigDecimal.valueOf(((Number)p.get("peso")).doubleValue()) 
+				: BigDecimal.ZERO);
+			item.setUnidades(p.get("unidades") != null 
+				? BigDecimal.valueOf(((Number)p.get("unidades")).doubleValue()) 
+				: BigDecimal.ZERO);
 
-		// Parsear productos y guardar en ticket_items
-		List<TicketItem> ticketItems = new ArrayList<>();
-		List<TicketItemResponse> ticketItemsResponse = new ArrayList<>();
+			ticketItemRepository.save(item); // Inserta en tabla ticket_items
 
-		if (resultadoJSON != null && !resultadoJSON.isBlank()) {
-			try {
-				ObjectMapper mapeador = new ObjectMapper();
-				JsonNode root = mapeador.readTree(resultadoJSON);
-				JsonNode arrProd = (root != null) ? root.get("productos") : null;
-
-				if (arrProd != null && arrProd.isArray()) {
-					for (JsonNode producto : arrProd) {
-
-						// TicketItem (Entidad JPA)
-						TicketItem item = new TicketItem();
-						item.setTicket(saved);
-
-						// codigo_producto
-						item.setCodigoProducto((producto.hasNonNull("codigo")) ? producto.get("codigo").asText() : "");
-
-						// nombre_producto
-						item.setNombreProducto(
-								(producto.hasNonNull("nombre")) ? producto.get("nombre").asText() : null);
-
-						// operaciones
-						item.setOperaciones(
-								(producto.hasNonNull("operaciones")) ? producto.get("operaciones").asInt() : 0);
-
-						// total_importe
-						item.setTotalImporte((producto.hasNonNull("importeTotal"))
-								? new java.math.BigDecimal(producto.get("importeTotal").asText())
-								: BigDecimal.ZERO);
-
-						// peso
-						item.setPeso(
-								(producto.hasNonNull("peso")) ? new java.math.BigDecimal(producto.get("peso").asText())
-										: BigDecimal.ZERO);
-
-						// unidades
-						item.setUnidades((producto.hasNonNull("unidades"))
-								? new java.math.BigDecimal(producto.get("unidades").asText())
-								: BigDecimal.ZERO);
-
-						ticketItems.add(item);
-
-						// TicketItemResponse (DTO de salida)
-						TicketItemResponse dto = new TicketItemResponse();
-						dto.setCodigo((producto.hasNonNull("codigo")) ? producto.get("codigo").asText() : "");
-						dto.setNombre((producto.hasNonNull("nombre")) ? producto.get("nombre").asText() : "");
-						dto.setUnidades((producto.hasNonNull("unidades")) ? producto.get("unidades").asInt() : 0);
-						dto.setPeso((producto.hasNonNull("peso")) ? producto.get("peso").asDouble() : 0.0);
-						dto.setImporteTotal(
-								(producto.hasNonNull("importeTotal")) ? producto.get("importeTotal").asDouble() : 0.0);
-						ticketItemsResponse.add(dto);
-					}
-				}
-			} catch (Exception e) {
-				e.printStackTrace();
-			}
+			// Agregamos al DTO de respuesta
+			TicketItemResponse responseItem = new TicketItemResponse();
+			responseItem.setNombre(item.getNombreProducto());
+			responseItem.setCodigo(item.getCodigoProducto());
+			responseItem.setOperaciones(item.getOperaciones());
+			responseItem.setImporteTotal(item.getTotalImporte().doubleValue());
+			responseItem.setPeso(item.getPeso().doubleValue());
+			responseItem.setUnidades(item.getUnidades().intValue());
+			itemsResponse.add(responseItem);
 		}
 
-		if (!ticketItems.isEmpty()) {
-			ticketItemRepository.saveAll(ticketItems);
-		}
+		// 3️⃣ Crear DTO de respuesta
+		TicketResponse ticketResponse = new TicketResponse();
+		ticketResponse.setId(ticket.getId());
+		ticketResponse.setFecha(ticket.getFechaTicket().toString());
+		ticketResponse.setUidUsuario(uidUsuario);
+		ticketResponse.setProductos(itemsResponse);
 
-		TicketResponse resp = new TicketResponse();
-		resp.setId(saved.getId());
-		resp.setFecha(peticion.getFecha());
-		resp.setUidUsuario(peticion.getUidUsuario());
-		resp.setProductos(ticketItemsResponse);
-
-		return resp;
+		return ticketResponse;
 	}
 
-	public List<LocalDate> listarFechasRegistradas(String uid) {
-		if (uid == null || uid.isBlank()) {
-			throw new IllegalArgumentException("El Id de Usuario no puede ser nulo o vacío");
-		}
-		return ticketRepository.findFechasRegistradas(uid);
-	}
 
-	private LocalDate parseFechaISO(String s) {
-		return LocalDate.parse(s); // formato yyyy-MM-dd
-	}
-
-	private String llamarUiPathStub(String texto) {
-		// [Integración real UiPath AQUÍ] -> mientras, stub para validar inserts
-		return """
-				  {
-				    "productos": [
-				      { "nombre":"CAMARONES", "codigo":"56557", "operaciones":1, "importeTotal":21.36, "peso":2.500, "unidades":2 },
-				      { "nombre":"PEPETES JL 400/600", "codigo":"888432", "operaciones":10, "importeTotal":999.90, "peso":11.800, "unidades":13 }
-				    ]
-				  }
-				""";
-	}
+    public List<LocalDate> listarFechasRegistradas(String uid) {
+        // TODO Auto-generated method stub
+        throw new UnsupportedOperationException("Unimplemented method 'listarFechasRegistradas'");
+    }
 
 }
