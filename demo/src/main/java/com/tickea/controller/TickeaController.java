@@ -10,6 +10,7 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -56,17 +57,18 @@ public class TickeaController {
     }
 
 
-
-
-
-    @GetMapping("/get-ticket-text")
-    public String getMethodName(@RequestParam String param) {
-        return new String();
+    @GetMapping("ticket-items")
+    public List<TicketItem> getTicketItems(@RequestParam("fecha") String fecha,
+                                           @RequestParam("uid") String uid) {
+        LocalDate fechaTicket = LocalDate.parse(fecha);
+        return tickeaService.getItemsByFechaAndUid(fechaTicket, uid);
     }
-    
-    @GetMapping ("/fechas-registradas")
-    public List<LocalDate> fechasRegistradas(@RequestParam String uid){
-    	return tickeaService.listarFechasRegistradas(uid);
+        @GetMapping("/ticket-items/rango")
+    public List<TicketItem> getTicketItemsRango(@RequestParam("fechaInicio") String fechaInicio,
+                                                @RequestParam("fechaFin") String fechaFin,
+                                                @RequestParam("uid") String uid) {
+        LocalDate inicio = LocalDate.parse(fechaInicio);
+        LocalDate fin = LocalDate.parse(fechaFin);
+        return tickeaService.getItemsByFechaRangeAndUidAggregated(inicio, fin, uid);
     }
-    
 }

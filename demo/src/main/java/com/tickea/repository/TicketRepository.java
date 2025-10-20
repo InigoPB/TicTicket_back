@@ -12,12 +12,14 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public interface TicketRepository extends JpaRepository<Ticket, Long> {
-	
-	  @Query("""
+
+	@Query("""
 		         select distinct t.fechaTicket
 		         from Ticket t
 		         where t.firebaseUid = :uid
 		         order by t.fechaTicket
 		         """)
 		  List<LocalDate> findFechasRegistradas(@Param("uid") String uid);
+
+
 }

@@ -9,19 +9,22 @@ import java.util.List;
 @Entity
 @Table(name = "tickets")
 public class Ticket {
-
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY) 
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-    
-    @Column(name = "firebase_uid", nullable = false, length = 128)
-    private String firebaseUid;
-    
-    @Column(name = "fecha_ticket", nullable = false)
-    private LocalDate fechaTicket;
-    
+
     @Column(name = "created_at", insertable = false, updatable = false)
     private Timestamp createdAt;
+
+    @Column(name = "fecha_ticket", nullable = false)
+    private LocalDate fechaTicket;
+
+    @Column(name = "firebase_uid", nullable = false, length = 128)
+    private String firebaseUid;
+
+    // Relación con TicketItem
+    @OneToMany(mappedBy = "ticket", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    private List<TicketItem> items;
     
 	public Long getId() {
 		return id;

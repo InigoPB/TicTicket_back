@@ -5,6 +5,8 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
+
 import org.json.JSONArray;
 import org.json.JSONObject;
 
@@ -159,9 +161,45 @@ public class TickeaService {
 
 
 
-    public List<LocalDate> listarFechasRegistradas(String uid) {
-        // TODO Auto-generated method stub
-        throw new UnsupportedOperationException("Unimplemented method 'listarFechasRegistradas'");
-    }
 
+    public List<TicketItem> getItemsByFechaAndUid(LocalDate fecha, String uid) {
+        return ticketItemRepository.findItemsByFechaAndUid(fecha, uid);
+    }
+        public List<TicketItem> getItemsByFechaRangeAndUid(LocalDate fechaInicio, LocalDate fechaFin, String uid) {
+        return ticketItemRepository.findItemsByFechaRangeAndUid(fechaInicio, fechaFin, uid);
+    }
+     public List<TicketItem> getItemsByFechaRangeAndUidAggregated(LocalDate fechaInicio, LocalDate fechaFin, String uid) {
+        List<TicketItem> items = ticketItemRepository.findItemsByFechaRangeAndUid(fechaInicio, fechaFin, uid);
+
+        // Crear lista para resultados finales sumando por codigoProducto
+        List<TicketItem> result = new ArrayList<>();
+
+        for (TicketItem item : items) {
+            boolean found = false;
+            for (TicketItem existing : result) {
+                if (existing.getCodigoProducto().equals(item.getCodigoProducto())) {
+                    existing.setOperaciones(existing.getOperaciones() + item.getOperaciones());
+                    existing.setTotalImporte(existing.getTotalImporte().add(item.getTotalImporte()));
+                    existing.setPeso(existing.getPeso().add(item.getPeso()));
+                    existing.setUnidades(existing.getUnidades().add(item.getUnidades()));
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) {
+                result.add(new TicketItem(
+                        item.getId(),
+                        item.getCodigoProducto(),
+                        item.getNombreProducto(),
+                        item.getOperaciones(),
+                        item.getTotalImporte(),
+                        item.getPeso(),
+                        item.getUnidades(),
+                        item.getCreatedAt()
+                ));
+            }
+        }
+
+        return result;
+    }
 }
