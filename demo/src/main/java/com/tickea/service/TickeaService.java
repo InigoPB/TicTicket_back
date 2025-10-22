@@ -159,6 +159,7 @@ public class TickeaService {
         return ticketResponse;
     }
 
+
     public List<TicketItem> getItemsByFechaAndUid(LocalDate fecha, String uid) {
         return ticketItemRepository.findItemsByFechaAndUid(fecha, uid);
     }
@@ -199,4 +200,11 @@ public class TickeaService {
 
         return result;
     }
+
+
+     public String getFechasRegistradas(String uid) {
+        // TODO Auto-generated method stub
+        return ticketRepository.findFechasRegistradas(uid).toString();
+     }
+
 }
