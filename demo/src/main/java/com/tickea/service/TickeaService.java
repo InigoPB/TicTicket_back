@@ -202,4 +202,9 @@ public class TickeaService {
 
         return result;
     }
+
+     public String getFechasRegistradas(String uid) {
+        // TODO Auto-generated method stub
+        return ticketRepository.findFechasRegistradas(uid).toString();
+     }
 }

@@ -14,6 +14,9 @@ import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+
 
 
 @CrossOrigin(origins = "*") //para pruebas
@@ -56,8 +59,13 @@ public class TickeaController {
         return ResponseEntity.ok(response);
     }
 
+    @GetMapping("/fechas-registradas")
+    public String getFechasRegistradas(@RequestParam String uid) {
+        return tickeaService.getFechasRegistradas(uid);
+    }
+    
 
-    @GetMapping("ticket-items")
+    @GetMapping("/ticket-items")
     public List<TicketItem> getTicketItems(@RequestParam("fecha") String fecha,
                                            @RequestParam("uid") String uid) {
         LocalDate fechaTicket = LocalDate.parse(fecha);
