@@ -2,8 +2,10 @@ package com.tickea.jpa;
 
 import java.math.BigDecimal;
 import java.sql.Timestamp;
-import jakarta.persistence.*;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+
+import jakarta.persistence.*;
 
 @Entity
 @Table(name = "ticket_items")
@@ -12,7 +14,8 @@ public class TicketItem {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToOne(optional = false)
+    @JsonIgnore // evita problemas de serialización
+    @ManyToOne(optional = false, fetch = FetchType.LAZY)
     @JoinColumn(name = "ticket_id", nullable = false)
     private Ticket ticket;
 
@@ -37,71 +40,84 @@ public class TicketItem {
     @Column(name = "created_at", insertable = false, updatable = false)
     private Timestamp createdAt;
 
-	public Long getId() {
-		return id;
-	}
+    public TicketItem() {
+        // constructor vacío
+    }
 
-	public Ticket getTicket() {
-		return ticket;
-	}
+    public TicketItem(Long id2, String codigoProducto2, String nombreProducto2, Integer operaciones2,
+            BigDecimal totalImporte2, BigDecimal peso2, BigDecimal unidades2, Timestamp createdAt2) {
+        this.id = id2;
+        this.codigoProducto = codigoProducto2;
+        this.nombreProducto = nombreProducto2;
+        this.operaciones = operaciones2;
+        this.totalImporte = totalImporte2;
+        this.peso = peso2;
+        this.unidades = unidades2;
+        this.createdAt = createdAt2;
+    }
 
-	public void setTicket(Ticket ticket) {
-		this.ticket = ticket;
-	}
+    // Getters y setters
+    public Long getId() {
+        return id;
+    }
 
-	public String getCodigoProducto() {
-		return codigoProducto;
-	}
+    public Ticket getTicket() {
+        return ticket;
+    }
 
-	public void setCodigoProducto(String codigoProducto) {
-		this.codigoProducto = codigoProducto;
-	}
+    public void setTicket(Ticket ticket) {
+        this.ticket = ticket;
+    }
 
-	public String getNombreProducto() {
-		return nombreProducto;
-	}
+    public String getCodigoProducto() {
+        return codigoProducto;
+    }
 
-	public void setNombreProducto(String nombreProducto) {
-		this.nombreProducto = nombreProducto;
-	}
+    public void setCodigoProducto(String codigoProducto) {
+        this.codigoProducto = codigoProducto;
+    }
 
-	public Integer getOperaciones() {
-		return operaciones;
-	}
+    public String getNombreProducto() {
+        return nombreProducto;
+    }
 
-	public void setOperaciones(Integer operaciones) {
-		this.operaciones = operaciones;
-	}
+    public void setNombreProducto(String nombreProducto) {
+        this.nombreProducto = nombreProducto;
+    }
 
-	public BigDecimal getTotalImporte() {
-		return totalImporte;
-	}
+    public Integer getOperaciones() {
+        return operaciones;
+    }
 
-	public void setTotalImporte(BigDecimal totalImporte) {
-		this.totalImporte = totalImporte;
-	}
+    public void setOperaciones(Integer operaciones) {
+        this.operaciones = operaciones;
+    }
 
-	public BigDecimal getPeso() {
-		return peso;
-	}
+    public BigDecimal getTotalImporte() {
+        return totalImporte;
+    }
 
-	public void setPeso(BigDecimal peso) {
-		this.peso = peso;
-	}
+    public void setTotalImporte(BigDecimal totalImporte) {
+        this.totalImporte = totalImporte;
+    }
 
-	public BigDecimal getUnidades() {
-		return unidades;
-	}
+    public BigDecimal getPeso() {
+        return peso;
+    }
 
-	public void setUnidades(BigDecimal unidades) {
-		this.unidades = unidades;
-	}
+    public void setPeso(BigDecimal peso) {
+        this.peso = peso;
+    }
 
-	public Timestamp getCreatedAt() {
-		return createdAt;
-	}
+    public BigDecimal getUnidades() {
+        return unidades;
+    }
 
-    
+    public void setUnidades(BigDecimal unidades) {
+        this.unidades = unidades;
+    }
 
+    public Timestamp getCreatedAt() {
+        return createdAt;
+    }
 }
-

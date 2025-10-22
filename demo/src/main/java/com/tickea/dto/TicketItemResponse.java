@@ -4,6 +4,7 @@ public class TicketItemResponse {
     private String nombre;
     private String codigo;
     private int unidades;
+	private int operaciones;
     private double peso;
     private double importeTotal;
     
@@ -37,6 +38,12 @@ public class TicketItemResponse {
 	}
 	public void setImporteTotal(double importeTotal) {
 		this.importeTotal = importeTotal;
+	}
+	public int getOperaciones() {
+		return operaciones;
+	}
+	public void setOperaciones(int operaciones) {
+		this.operaciones = operaciones;
 	}
     
     
