@@ -1,14 +1,17 @@
 {
-    "configurations": [
-        {
-            "type": "java",
-            "name": "Spring Boot-TickeaApplication<demo>",
-            "request": "launch",
-            "cwd": "${workspaceFolder}",
-            "mainClass": "com.tickea.TickeaApplication",
-            "projectName": "demo",
-            "args": "",
-            "envFile": "${workspaceFolder}/.env"
-        }
-    ]
+  "version": "0.2.0",
+  "configurations": [
+    
+    {
+      "type": "java",
+      "name": "Spring Boot-TickeaApplication<demo>",
+      "request": "launch",
+      "cwd": "${workspaceFolder}/demo",
+      "mainClass": "com.tickea.TickeaApplication",
+      "projectName": "demo",
+      "args": "--spring.profiles.active=local",
+      "vmArgs": "-Djava.net.preferIPv4Stack=true",
+      "envFile": "${workspaceFolder}/demo/.env"
+    }
+  ]
 }
