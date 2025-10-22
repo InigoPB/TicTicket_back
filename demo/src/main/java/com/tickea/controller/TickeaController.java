@@ -71,7 +71,4 @@ public class TickeaController {
         LocalDate fin = LocalDate.parse(fechaFin);
         return tickeaService.getItemsByFechaRangeAndUidAggregated(inicio, fin, uid);
     }
-        @GetMapping ("/fechas-registradas")
-        public List<LocalDate> fechasRegistradas(@RequestParam String uid){
-            return tickeaService.listarFechasRegistradas(uid);
 }
