@@ -59,10 +59,9 @@ public class TickeaController {
     }
 
     @GetMapping("/fechas-registradas")
-    public String getFechasRegistradas(@RequestParam String uid) {
+    public List<String> getFechasRegistradas(@RequestParam String uid) {
         return tickeaService.getFechasRegistradas(uid);
     }
-    
 
     @GetMapping("/ticket-items")
     public List<TicketItem> getTicketItems(@RequestParam("fecha") String fecha,
