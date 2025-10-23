@@ -13,6 +13,7 @@ import org.json.JSONObject;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.web.util.UriComponentsBuilder;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -46,7 +47,7 @@ public class TickeaService {
 		this.ticketItemRepository = ticketItemRepository;
 	}
 
-	public String StartJob(String textoFilas) throws Exception {
+public String StartJob(String textoFilas, String uidUsuario, String fecha) throws Exception {
     final int TIMEOUT_MS = 300_000; // 5 minutos máximo de espera
     final int POLL_INTERVAL_MS = 5000; // cada 5 segundos
 
@@ -57,14 +58,21 @@ public class TickeaService {
     RestTemplate restTemplate = new RestTemplate();
     ObjectMapper mapper = new ObjectMapper();
 
-    // Convertir textoFilas a JSON
+    // 1. Convertir textoFilas a JSON para el BODY
     ObjectNode bodyJson = mapper.createObjectNode();
-    bodyJson.put("texto_ocr", textoFilas);
+    bodyJson.put("textoFilas", textoFilas);
+    // uidUsuario y fecha NO se incluyen aquí
 
     HttpEntity<String> request = new HttpEntity<>(mapper.writeValueAsString(bodyJson), headers);
 
-    // Lanzar el job
-    ResponseEntity<String> postResponse = restTemplate.exchange(UIPATH_URL, HttpMethod.POST, request, String.class);
+    // 2. Construir la URL con parámetros de consulta (query parameters)
+    String urlConParams = UriComponentsBuilder.fromHttpUrl(UIPATH_URL)
+            .queryParam("uidUsuario", uidUsuario)
+            .queryParam("fecha", fecha)
+            .toUriString();
+
+    // Lanzar el job con la URL modificada
+    ResponseEntity<String> postResponse = restTemplate.exchange(urlConParams, HttpMethod.POST, request, String.class);
 
     if (!postResponse.getStatusCode().is2xxSuccessful()) {
         throw new RuntimeException("Error al lanzar el job: " + postResponse.getBody());
