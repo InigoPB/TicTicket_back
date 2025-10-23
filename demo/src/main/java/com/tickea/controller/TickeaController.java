@@ -31,10 +31,12 @@ public class TickeaController {
         this.tickeaService = tickeaService;
     }
     @PostMapping("/StartJob")
-    public ResponseEntity<String> startJob(@RequestBody String entity) {
+    public ResponseEntity<String> startJob(@RequestBody String ocr_text,
+            @RequestParam String uidUsuario,
+            @RequestParam String fecha) {
         try {
             // Llama al servicio y obtiene la respuesta final del job
-            String jobResult = tickeaService.StartJob(entity);
+            String jobResult = tickeaService.StartJob(ocr_text, uidUsuario, fecha);
 
             // Devuelve la respuesta completa del job con HTTP 200
             return ResponseEntity.ok(jobResult);
